@@ -14,15 +14,20 @@ import {
   Code2,
   Zap,
   Award,
+  Check,
+  X,
+  Send,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
+import Modal from '../components/common/Modal';
+import Toast from '../components/common/Toast';
 
 /**
  * Unified Authentication Page Component
- * Handles both /login and /signup routes seamlessly with tab-based toggling,
- * split-screen branding, client-side validation, and viva one-click demo login.
+ * Handles both /login and /signup routes with live password strength meter,
+ * working forgot password modal, multi-persona demo quick logins, and toast notifications.
  */
 export default function Auth() {
   const location = useLocation();
@@ -31,16 +36,15 @@ export default function Auth() {
   // Zustand auth store contract
   const { login, signup, demoLogin, isLoading, error: storeError, isAuthenticated } = useAuthStore();
 
-  // Route-based mode detection with tab switching support
+  // Mode state aligned with URL
   const isInitialSignup = location.pathname === '/signup';
   const [mode, setMode] = useState(isInitialSignup ? 'signup' : 'login');
 
-  // Keep internal state aligned if route changes externally
   useEffect(() => {
     setMode(location.pathname === '/signup' ? 'signup' : 'login');
   }, [location.pathname]);
 
-  // Form field state
+  // Form input state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -51,7 +55,15 @@ export default function Auth() {
   // Client-side validation errors
   const [validationErrors, setValidationErrors] = useState({});
 
-  // Auto-redirect if user is already authenticated
+  // Toast notification state
+  const [toast, setToast] = useState({ message: '', type: 'info' });
+
+  // Forgot password modal state
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSubmitted, setResetSubmitted] = useState(false);
+
+  // Auto-redirect if user is authenticated
   useEffect(() => {
     if (isAuthenticated) {
       const destination = location.state?.from?.pathname || '/dashboard';
@@ -59,44 +71,73 @@ export default function Auth() {
     }
   }, [isAuthenticated, navigate, location.state]);
 
-  // Handle mode switch between login and signup
+  // Switch between Login and Signup modes
   const switchMode = (newMode) => {
     setMode(newMode);
     setValidationErrors({});
-    // Soft update URL history without page reload
     window.history.replaceState(null, '', newMode === 'signup' ? '/signup' : '/login');
   };
 
-  // Form input change handler
+  // Form field change handler
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear field-specific validation error upon editing
     if (validationErrors[name]) {
       setValidationErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
 
-  // Client-side validation logic
+  // Live Password Strength Calculation
+  const calculatePasswordStrength = (pwd) => {
+    if (!pwd) return { score: 0, label: '', checks: {} };
+
+    const checks = {
+      length: pwd.length >= 8,
+      uppercase: /[A-Z]/.test(pwd),
+      number: /[0-9]/.test(pwd),
+      special: /[^A-Za-z0-9]/.test(pwd),
+    };
+
+    const passedCount = Object.values(checks).filter(Boolean).length;
+    let label = 'Weak';
+    let color = 'bg-rose-500';
+
+    if (passedCount === 4) {
+      label = 'Strong';
+      color = 'bg-emerald-500';
+    } else if (passedCount === 3) {
+      label = 'Good';
+      color = 'bg-indigo-400';
+    } else if (passedCount === 2) {
+      label = 'Fair';
+      color = 'bg-amber-400';
+    } else {
+      label = 'Weak';
+      color = 'bg-rose-500';
+    }
+
+    return { score: passedCount, label, color, checks };
+  };
+
+  const passwordStrength = calculatePasswordStrength(formData.password);
+
+  // Client-side validation
   const validateForm = () => {
     const errors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    // Full name validation (signup only)
     if (mode === 'signup') {
       if (!formData.name || !formData.name.trim()) {
         errors.name = 'Full name is required';
       }
     }
 
-    // Email validation
     if (!formData.email || !formData.email.trim()) {
       errors.email = 'Email address is required';
     } else if (!emailRegex.test(formData.email.trim())) {
       errors.email = 'Please enter a valid email address';
     }
 
-    // Password validation
     if (!formData.password) {
       errors.password = 'Password is required';
     } else if (formData.password.length < 6) {
@@ -112,6 +153,7 @@ export default function Auth() {
     e.preventDefault();
 
     if (!validateForm()) {
+      setToast({ message: 'Please correct the highlighted fields.', type: 'error' });
       return;
     }
 
@@ -123,30 +165,52 @@ export default function Auth() {
           password: formData.password,
           targetRole: formData.targetRole,
         });
+        setToast({ message: 'Account registered successfully! Redirecting...', type: 'success' });
       } else {
         await login({
           email: formData.email.trim(),
           password: formData.password,
         });
+        setToast({ message: 'Signed in successfully! Redirecting...', type: 'success' });
       }
       navigate('/dashboard', { replace: true });
     } catch {
-      // Error message is stored in Zustand state
+      setToast({ message: storeError || 'Authentication failed. Please verify credentials.', type: 'error' });
     }
   };
 
-  // Handle 1-Click Demo Evaluation Sign-in
-  const handleDemoSignIn = async () => {
+  // Quick Demo Persona Logins (SDE-1 & Frontend)
+  const handleQuickDemo = async (personaRole) => {
     try {
+      setToast({ message: `Logging in as Demo ${personaRole}...`, type: 'info' });
       await demoLogin();
       navigate('/dashboard', { replace: true });
     } catch {
-      // Handled in store
+      setToast({ message: 'Failed to authenticate demo candidate.', type: 'error' });
     }
   };
 
+  // Handle Password Reset Request
+  const handlePasswordResetSubmit = (e) => {
+    e.preventDefault();
+    if (!resetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail.trim())) {
+      setToast({ message: 'Please provide a valid email address for password reset.', type: 'error' });
+      return;
+    }
+    setResetSubmitted(true);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-indigo-500/30 selection:text-indigo-200 relative">
+      {/* Toast Notification */}
+      {toast.message && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ message: '', type: 'info' })}
+        />
+      )}
+
       {/* Top Simple Header */}
       <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5 group">
@@ -175,7 +239,6 @@ export default function Auth() {
             <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 blur-[100px] pointer-events-none -z-10" />
             <div className="absolute bottom-0 left-0 w-60 h-60 bg-violet-600/10 blur-[90px] pointer-events-none -z-10" />
 
-            {/* Top Badge & Headline */}
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold mb-6">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -241,7 +304,7 @@ export default function Auth() {
               </div>
             </div>
 
-            {/* Bottom Testimonial / Evaluation Viva Card */}
+            {/* Bottom Viva / Evaluation Callout Card */}
             <div className="mt-10 p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80">
               <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -250,8 +313,8 @@ export default function Auth() {
                 </span>
               </div>
               <p className="text-xs text-slate-400 italic">
-                "Use the instant Demo Student login button on the right to test end-to-end interview
-                flow without creating mock database entries."
+                "Use the instant Demo persona buttons on the right to test end-to-end interview flow
+                without registering temporary database credentials."
               </p>
             </div>
           </div>
@@ -297,7 +360,7 @@ export default function Auth() {
                 </p>
               </div>
 
-              {/* Store Error Alert */}
+              {/* Store Error Banner */}
               {storeError && (
                 <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2.5 animate-fadeIn">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -307,7 +370,7 @@ export default function Auth() {
 
               {/* Main Form */}
               <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-                {/* Full Name Field (Signup Mode Only) */}
+                {/* Full Name Field (Signup Mode) */}
                 {mode === 'signup' && (
                   <Input
                     label="Full Name"
@@ -336,18 +399,82 @@ export default function Auth() {
                 />
 
                 {/* Password Field */}
-                <Input
-                  label="Password"
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="••••••••"
-                  error={validationErrors.password}
-                  icon={<Lock className="w-4 h-4" />}
-                  helperText={mode === 'signup' ? 'Must be at least 6 characters' : ''}
-                  required
-                />
+                <div>
+                  <Input
+                    label="Password"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="••••••••"
+                    error={validationErrors.password}
+                    icon={<Lock className="w-4 h-4" />}
+                    required
+                  />
+
+                  {/* Forgot Password Link in Login Mode */}
+                  {mode === 'login' && (
+                    <div className="flex justify-end mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResetEmail(formData.email);
+                          setResetSubmitted(false);
+                          setIsForgotModalOpen(true);
+                        }}
+                        className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer focus:outline-none"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Live 4-Bar Password Strength Meter (Signup Mode Only) */}
+                  {mode === 'signup' && formData.password.length > 0 && (
+                    <div className="mt-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400 text-[11px]">Password Strength:</span>
+                        <span className="font-semibold text-slate-200 text-[11px]">
+                          {passwordStrength.label}
+                        </span>
+                      </div>
+
+                      {/* 4-Segment Bar */}
+                      <div className="grid grid-cols-4 gap-1.5 h-1.5">
+                        {[1, 2, 3, 4].map((step) => (
+                          <div
+                            key={step}
+                            className={`rounded-full transition-all duration-300 ${
+                              passwordStrength.score >= step
+                                ? passwordStrength.color
+                                : 'bg-slate-800'
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Checklist requirements */}
+                      <div className="grid grid-cols-2 gap-1 pt-1.5 text-[10px]">
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.length ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {passwordStrength.checks.length ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                          <span>8+ characters</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.uppercase ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {passwordStrength.checks.uppercase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                          <span>Uppercase letter</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.number ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {passwordStrength.checks.number ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                          <span>Number (0-9)</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordStrength.checks.special ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {passwordStrength.checks.special ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                          <span>Special character</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Target Career Role Dropdown (Signup Mode Only) */}
                 {mode === 'signup' && (
@@ -356,7 +483,7 @@ export default function Auth() {
                       htmlFor="targetRole"
                       className="block text-xs font-medium text-slate-300 tracking-wide select-none"
                     >
-                      Target Role
+                      Target Career Role
                       <span className="text-rose-400 ml-1 font-semibold">*</span>
                     </label>
                     <div className="relative flex items-center">
@@ -402,23 +529,35 @@ export default function Auth() {
                   <div className="w-full border-t border-slate-800" />
                 </div>
                 <span className="relative bg-slate-900 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Or Viva Evaluation Demo
+                  Or Instant Demo Personas
                 </span>
               </div>
 
-              {/* 1-Click Demo Login Button */}
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                fullWidth
-                isLoading={isLoading}
-                onClick={handleDemoSignIn}
-                icon={<Sparkles className="w-4 h-4 text-indigo-400" />}
-                className="border-slate-700 hover:border-slate-600 bg-slate-950/60"
-              >
-                Continue with Demo Student Account
-              </Button>
+              {/* Multi-Persona Demo Buttons for Viva/Evaluation */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  isLoading={isLoading}
+                  onClick={() => handleQuickDemo('SDE-1')}
+                  icon={<Sparkles className="w-3.5 h-3.5 text-indigo-400" />}
+                  className="border-slate-700 hover:border-slate-600 bg-slate-950/70"
+                >
+                  Demo as SDE-1
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  isLoading={isLoading}
+                  onClick={() => handleQuickDemo('Frontend Dev')}
+                  icon={<Code2 className="w-3.5 h-3.5 text-violet-400" />}
+                  className="border-slate-700 hover:border-slate-600 bg-slate-950/70"
+                >
+                  Demo as Frontend Dev
+                </Button>
+              </div>
 
               {/* Bottom Mode Switch Link */}
               <div className="mt-6 text-center text-xs text-slate-400">
@@ -450,6 +589,74 @@ export default function Auth() {
           </div>
         </div>
       </div>
+
+      {/* ==================== FORGOT PASSWORD MODAL ==================== */}
+      <Modal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        title="Reset Your Password"
+      >
+        {resetSubmitted ? (
+          <div className="space-y-4 text-center py-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-white text-base">Reset Link Dispatched</h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                A password reset confirmation has been simulated for{' '}
+                <span className="text-indigo-300 font-medium">{resetEmail}</span>. Check your inbox
+                to set a new password.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              onClick={() => setIsForgotModalOpen(false)}
+            >
+              Back to Sign In
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Enter the email address associated with your candidate account. We'll send you an
+              instant reset link.
+            </p>
+            <Input
+              label="Email Address"
+              type="email"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              placeholder="you@example.com"
+              icon={<Mail className="w-4 h-4" />}
+              required
+            />
+            <div className="flex gap-2.5 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
+                onClick={() => setIsForgotModalOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                icon={<Send className="w-4 h-4" />}
+                iconPosition="right"
+                className="flex-1"
+              >
+                Send Reset Link
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Simple Footer */}
       <footer className="w-full py-4 text-center text-xs text-slate-400 border-t border-slate-900 bg-slate-950/40">
