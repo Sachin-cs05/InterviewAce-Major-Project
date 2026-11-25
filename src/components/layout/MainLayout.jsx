@@ -8,15 +8,18 @@ import {
   User,
   Menu,
   X,
-  Radio,
-  ChevronRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import ErrorBoundary from './ErrorBoundary';
 
 /**
  * Main application layout wrapper.
- * Features a responsive dark-mode Navbar with branding, navigation links, user badge, and logout.
- * Automatically hides the Navbar when on `/interview/:sessionId` for an immersive, distraction-free interview.
+ * Features an upgraded responsive dark-mode Navbar with active route highlighting,
+ * user profile pill (name + target role from useAuthStore), mobile hamburger menu drawer,
+ * and a secure Logout button.
+ * 
+ * Automatically hides the Navbar when on `/interview/:sessionId` (or any route starting with `/interview/`)
+ * for an immersive, distraction-free full-screen live interview environment.
  */
 export default function MainLayout() {
   const location = useLocation();
@@ -25,7 +28,7 @@ export default function MainLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Distraction-free interview mode: hide navigation bar when inside the active interview room
-  const isInterviewRoom = /^\/interview\/[^/]+$/.test(location.pathname);
+  const isInterviewRoom = location.pathname.startsWith('/interview/');
 
   const handleLogout = () => {
     logout();
@@ -34,7 +37,7 @@ export default function MainLayout() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
-      {/* Top Navbar: Hidden in Live Interview Room for immersive full-screen UX */}
+      {/* Top Navbar: Automatically hidden in Live Interview Room for immersive full-screen UX */}
       {!isInterviewRoom && (
         <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -60,38 +63,38 @@ export default function MainLayout() {
                 </div>
               </Link>
 
-              {/* Desktop Navigation Links */}
-              <nav className="hidden md:flex items-center gap-1">
+              {/* Desktop Navigation Links with Active Highlighting */}
+              <nav className="hidden md:flex items-center gap-2">
                 <NavLink
                   to="/dashboard"
                   className={({ isActive }) =>
-                    `flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-slate-800/90 text-indigo-400 shadow-sm border border-slate-700/60'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                        ? 'bg-slate-800 text-indigo-400 border border-indigo-500/30 shadow-sm shadow-indigo-500/10'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
                     }`
                   }
                 >
                   <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
+                  <span>Dashboard</span>
                 </NavLink>
 
                 <NavLink
                   to="/setup"
                   className={({ isActive }) =>
-                    `flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                    `flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
                     }`
                   }
                 >
                   <PlayCircle className="w-4 h-4" />
-                  New Interview
+                  <span>New Interview</span>
                 </NavLink>
               </nav>
 
-              {/* User Profile Badge & Logout */}
+              {/* User Profile Pill & Logout Button */}
               <div className="hidden md:flex items-center gap-4">
                 <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
                   <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
@@ -101,7 +104,7 @@ export default function MainLayout() {
                     <span className="text-sm font-medium text-slate-200 leading-none">
                       {user?.name || 'Dev Candidate'}
                     </span>
-                    <span className="text-xs text-indigo-400 mt-1 font-mono">
+                    <span className="text-[11px] text-indigo-400 mt-1 font-mono leading-none">
                       {user?.targetRole || 'SDE-1'}
                     </span>
                   </div>
@@ -110,14 +113,14 @@ export default function MainLayout() {
                 <button
                   onClick={handleLogout}
                   title="Logout"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-transparent hover:border-rose-500/20"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-transparent hover:border-rose-500/20 cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Logout</span>
                 </button>
               </div>
 
-              {/* Mobile Menu Button */}
+              {/* Mobile Hamburger Menu Button */}
               <div className="flex md:hidden">
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -148,19 +151,31 @@ export default function MainLayout() {
               <NavLink
                 to="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-900"
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-slate-800 text-indigo-400 border border-slate-700'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  }`
+                }
               >
                 <LayoutDashboard className="w-4 h-4 text-indigo-400" />
-                Dashboard
+                <span>Dashboard</span>
               </NavLink>
 
               <NavLink
                 to="/setup"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-indigo-400 hover:bg-slate-900"
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  }`
+                }
               >
                 <PlayCircle className="w-4 h-4 text-indigo-400" />
-                New Interview
+                <span>New Interview</span>
               </NavLink>
 
               <button
@@ -168,19 +183,25 @@ export default function MainLayout() {
                   setMobileMenuOpen(false);
                   handleLogout();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-rose-400 hover:bg-rose-500/10 transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-rose-400 hover:bg-rose-500/10 transition-colors text-left cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                Logout
+                <span>Logout</span>
               </button>
             </div>
           )}
         </header>
       )}
 
-      {/* Main App Content Viewport */}
-      <main className={`flex-1 ${isInterviewRoom ? 'h-screen overflow-hidden' : 'p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto'}`}>
-        <Outlet />
+      {/* Main App Content Viewport wrapped with ErrorBoundary */}
+      <main
+        className={`flex-1 ${
+          isInterviewRoom ? 'h-screen overflow-hidden p-0' : 'p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto'
+        }`}
+      >
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       {/* Footer (Hidden during live interview) */}
