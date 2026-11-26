@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // Layout Wrappers
@@ -24,41 +24,55 @@ import InterviewDetailPage from './pages/InterviewDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 
+// Authentication Store
+import { useAuthStore } from './store/useAuthStore';
+
+/**
+ * Public route wrapper that redirects authenticated users to /dashboard.
+ */
+function PublicOnlyRoute({ children }) {
+  const { isAuthenticated, isInitialized } = useAuthStore();
+
+  if (isInitialized && isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
 /**
  * Root Application Component with centralized routing table (White & Emerald Theme).
- * 
- * Route Map:
- * - Public:
- *   /                     -> LandingPage
- *   /login                -> LoginPage
- *   /signup               -> SignupPage
- *   /about                -> AboutPage
- * 
- * - Protected (Inside ProtectedRoute & MainLayout):
- *   /dashboard            -> DashboardPage
- *   /setup                -> InterviewSetupPage
- *   /interview/new        -> InterviewSetupPage (alias)
- *   /device-check         -> DeviceCheckPage
- *   /interview/:sessionId -> InterviewRoomPage (auto-hides nav for full-screen interview)
- *   /report/:sessionId    -> FeedbackReportPage
- *   /interview/:sessionId/result -> FeedbackReportPage (alias)
- *   /history              -> HistoryPage
- *   /history/:sessionId   -> InterviewDetailPage
- *   /profile              -> ProfilePage
- *   /settings             -> SettingsPage
- * 
- * - Fallback Wildcard:
- *   *                     -> NotFoundPage (404)
  */
 export default function App() {
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+
+  useEffect(() => {
+    // Restore session on app boot
+    initializeAuth();
+  }, [initializeAuth]);
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <LoginPage />
+              </PublicOnlyRoute>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <PublicOnlyRoute>
+                <SignupPage />
+              </PublicOnlyRoute>
+            }
+          />
           <Route path="/about" element={<AboutPage />} />
 
           {/* Protected Routes inside Main Dashboard Layout */}

@@ -25,6 +25,8 @@ import Modal from '../components/common/Modal';
 import EmptyState from '../components/common/EmptyState';
 import { formatDate, formatDuration, getScoreBadgeColor, getScoreTextColor } from '../utils/formatters';
 import { getPastInterviews } from '../services/interviewService';
+import { useAuthStore } from '../store/useAuthStore';
+import { getUserInterviewHistory, saveUserInterviewHistory } from '../utils/userStorage';
 
 /**
  * Pre-seeded mock sessions if user has no saved history yet
@@ -81,6 +83,7 @@ const INITIAL_MOCK_HISTORY = [
  */
 export default function HistoryPage() {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const [history, setHistory] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('ALL');
@@ -89,24 +92,21 @@ export default function HistoryPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load history from localStorage or seed
+  // Load history from user-isolated storage or seed
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('interviewace-history');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setHistory(parsed);
-          return;
-        }
+      const stored = getUserInterviewHistory(user?.id);
+      if (stored && stored.length > 0) {
+        setHistory(stored);
+        return;
       }
-      // Seed with initial realistic mock history
-      localStorage.setItem('interviewace-history', JSON.stringify(INITIAL_MOCK_HISTORY));
+      // Seed with initial realistic mock history for demonstration
+      saveUserInterviewHistory(user?.id, INITIAL_MOCK_HISTORY);
       setHistory(INITIAL_MOCK_HISTORY);
     } catch {
       setHistory(INITIAL_MOCK_HISTORY);
     }
-  }, []);
+  }, [user?.id]);
 
   // Filtered and sorted history
   const filteredHistory = useMemo(() => {
@@ -160,9 +160,9 @@ export default function HistoryPage() {
     const updated = history.filter((item) => item.sessionId !== deleteTarget.sessionId);
     setHistory(updated);
     try {
-      localStorage.setItem('interviewace-history', JSON.stringify(updated));
+      saveUserInterviewHistory(user?.id, updated);
     } catch (e) {
-      console.warn('Failed to update localStorage history:', e);
+      console.warn('Failed to update user history:', e);
     }
     setIsDeleting(false);
     setDeleteTarget(null);

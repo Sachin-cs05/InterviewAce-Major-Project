@@ -3,13 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Sparkles,
   UserPlus,
-  ArrowRight,
   AlertCircle,
   CheckCircle2,
   Mail,
   Lock,
   User,
-  Briefcase,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import Button from '../components/common/Button';
@@ -18,35 +16,51 @@ import Select from '../components/common/Select';
 
 /**
  * Split-screen Signup Page (White & Emerald Theme)
+ * Registers candidates via POST /api/auth/signup with HttpOnly JWT session creation.
  */
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { signup, isLoading, error } = useAuthStore();
+  const { signup, isLoading, error, clearError } = useAuthStore();
 
-  const [name, setName] = useState('Alex Johnson');
-  const [email, setEmail] = useState('alex@example.com');
-  const [password, setPassword] = useState('password123');
-  const [confirmPassword, setConfirmPassword] = useState('password123');
-  const [targetRole, setTargetRole] = useState('Software Engineer');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [targetRole, setTargetRole] = useState('Frontend Developer');
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [validationError, setValidationError] = useState('');
 
   const roleOptions = [
-    'Software Engineer',
-    'Frontend Developer',
-    'Backend Developer',
-    'Full Stack MERN',
-    'Data Analyst',
-    'Java Developer',
-    'Python Developer',
+    { value: 'Software Engineer', label: 'Software Engineer' },
+    { value: 'Frontend Developer', label: 'Frontend Developer' },
+    { value: 'Backend Developer', label: 'Backend Developer' },
+    { value: 'Full Stack MERN', label: 'Full Stack MERN' },
+    { value: 'Data Analyst', label: 'Data Analyst' },
+    { value: 'Java Developer', label: 'Java Developer' },
+    { value: 'Python Developer', label: 'Python Developer' },
   ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setValidationError('');
+    clearError();
 
-    if (!name || !email || !password) {
-      setValidationError('Please fill out all required fields.');
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      setValidationError('Name must be at least 2 characters long.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setValidationError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password || password.length < 8) {
+      setValidationError('Password must be at least 8 characters long.');
       return;
     }
 
@@ -61,10 +75,15 @@ export default function SignupPage() {
     }
 
     try {
-      await signup({ name, email, password, targetRole });
+      await signup({
+        name: trimmedName,
+        email: trimmedEmail,
+        password,
+        targetRole,
+      });
       navigate('/dashboard', { replace: true });
     } catch {
-      // error handled in store
+      // Error message is caught and handled inside useAuthStore
     }
   };
 
@@ -102,11 +121,11 @@ export default function SignupPage() {
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                <span>Zero backend server installation needed</span>
+                <span>Persistent MongoDB user profile & preferences</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                <span>Private local browser session storage</span>
+                <span>Private candidate interview session isolation</span>
               </div>
             </div>
           </div>
@@ -145,7 +164,11 @@ export default function SignupPage() {
                 name="name"
                 placeholder="Jane Doe"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (validationError) setValidationError('');
+                  if (error) clearError();
+                }}
                 icon={<User className="w-4 h-4" />}
                 required
               />
@@ -156,7 +179,11 @@ export default function SignupPage() {
                 name="email"
                 placeholder="jane@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (validationError) setValidationError('');
+                  if (error) clearError();
+                }}
                 icon={<Mail className="w-4 h-4" />}
                 required
               />
@@ -166,9 +193,13 @@ export default function SignupPage() {
                   label="Password"
                   type="password"
                   name="password"
-                  placeholder="••••••••"
+                  placeholder="Min 8 chars"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (validationError) setValidationError('');
+                    if (error) clearError();
+                  }}
                   icon={<Lock className="w-4 h-4" />}
                   required
                 />
@@ -176,9 +207,13 @@ export default function SignupPage() {
                   label="Confirm Password"
                   type="password"
                   name="confirmPassword"
-                  placeholder="••••••••"
+                  placeholder="Confirm password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (validationError) setValidationError('');
+                    if (error) clearError();
+                  }}
                   icon={<Lock className="w-4 h-4" />}
                   required
                 />

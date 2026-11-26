@@ -3,7 +3,6 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   Sparkles,
   LogIn,
-  ArrowRight,
   AlertCircle,
   CheckCircle2,
   Mail,
@@ -16,42 +15,90 @@ import Input from '../components/common/Input';
 
 /**
  * Split-screen Login Page (White & Emerald Theme)
+ * Authenticates against backend POST /api/auth/login with HttpOnly cookie sessions.
  */
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, demoLogin, isLoading, error } = useAuthStore();
+  const { login, signup, isLoading, error, clearError } = useAuthStore();
 
-  const [email, setEmail] = useState('alex@example.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [validationError, setValidationError] = useState('');
+  const [isDemoLoading, setIsDemoLoading] = useState(false);
 
   const destination = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setValidationError('');
+    clearError();
 
-    if (!email || !password) {
-      setValidationError('Please enter both email and password.');
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setValidationError('Please enter your email address.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setValidationError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password) {
+      setValidationError('Please enter your password.');
       return;
     }
 
     try {
-      await login({ email, password });
+      await login({ email: trimmedEmail, password });
       navigate(destination, { replace: true });
-    } catch (err) {
-      // error handled in store
+    } catch {
+      // Error message is caught and set inside useAuthStore
     }
   };
 
+  /**
+   * One-click demo login for college evaluations and quick tests.
+   * Attempts to login as demo candidate; automatically signs up if account is not yet seeded.
+   */
   const handleDemoSignIn = async () => {
+    setValidationError('');
+    clearError();
+    setIsDemoLoading(true);
+
+    const demoCredentials = {
+      name: 'Alex Johnson',
+      email: 'alex.candidate@interviewace.dev',
+      password: 'Password123!',
+      targetRole: 'Frontend Developer',
+    };
+
     try {
-      await demoLogin();
-      navigate(destination, { replace: true });
-    } catch {
-      // error handled in store
+      // 1. Try logging in with demo account
+      try {
+        await login({ email: demoCredentials.email, password: demoCredentials.password });
+        navigate(destination, { replace: true });
+        return;
+      } catch (loginErr) {
+        // If login failed because user does not exist in MongoDB, auto-register demo candidate
+        if (
+          loginErr.message?.toLowerCase().includes('invalid') ||
+          loginErr.message?.toLowerCase().includes('not found') ||
+          loginErr.message?.toLowerCase().includes('credentials')
+        ) {
+          await signup(demoCredentials);
+          navigate(destination, { replace: true });
+          return;
+        }
+        throw loginErr;
+      }
+    } catch (err) {
+      setValidationError(err.message || 'Demo sign-in failed. Please ensure the backend server is running.');
+    } finally {
+      setIsDemoLoading(false);
     }
   };
 
@@ -60,7 +107,7 @@ export default function LoginPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen">
         {/* Left Side: Branding & Features (Desktop only) */}
         <div className="hidden lg:flex lg:col-span-5 bg-emerald-600 text-white p-12 flex-col justify-between relative overflow-hidden">
-          {/* Subtle geometric circles */}
+          {/* Geometric ambient circles */}
           <div className="absolute -top-12 -left-12 w-64 h-64 bg-emerald-500 rounded-full opacity-40 blur-xl" />
           <div className="absolute -bottom-16 -right-16 w-80 h-80 bg-emerald-700 rounded-full opacity-40 blur-2xl" />
 
@@ -103,7 +150,7 @@ export default function LoginPage() {
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                <span>Instant local session persistence in storage</span>
+                <span>Secure HttpOnly JWT authentication & session isolation</span>
               </div>
             </div>
           </div>
@@ -146,7 +193,11 @@ export default function LoginPage() {
                 name="email"
                 placeholder="candidate@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (validationError) setValidationError('');
+                  if (error) clearError();
+                }}
                 icon={<Mail className="w-4 h-4" />}
                 required
               />
@@ -157,7 +208,11 @@ export default function LoginPage() {
                 name="password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (validationError) setValidationError('');
+                  if (error) clearError();
+                }}
                 icon={<Lock className="w-4 h-4" />}
                 required
               />
@@ -172,14 +227,14 @@ export default function LoginPage() {
                   />
                   <span>Remember me</span>
                 </label>
-                <span className="text-slate-400">Demo Prototype</span>
+                <span className="text-slate-400">Secure Session</span>
               </div>
 
               <Button
                 type="submit"
                 variant="primary"
                 fullWidth
-                isLoading={isLoading}
+                isLoading={isLoading && !isDemoLoading}
                 icon={<LogIn className="w-4 h-4" />}
               >
                 Sign In
@@ -202,7 +257,7 @@ export default function LoginPage() {
               variant="secondary"
               fullWidth
               onClick={handleDemoSignIn}
-              isLoading={isLoading}
+              isLoading={isDemoLoading}
               icon={<Sparkles className="w-4 h-4 text-emerald-600" />}
             >
               1-Click Demo Candidate Login

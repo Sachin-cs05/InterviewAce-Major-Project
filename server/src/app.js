@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { rateLimitMiddleware } from './middleware/rateLimitMiddleware.js';
 import { notFoundMiddleware } from './middleware/notFoundMiddleware.js';
@@ -17,13 +18,16 @@ app.disable('x-powered-by');
 // Security headers with Helmet
 app.use(helmet());
 
-// CORS configuration supporting configured frontend origins
+// Cookie parser for HttpOnly authentication and CSRF cookies
+app.use(cookieParser());
+
+// CORS configuration supporting configured frontend origins with credentials
 const allowedOrigins = [env.CLIENT_URL, 'http://localhost:5173'].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. curl, postman, server-to-server)
+      // Allow requests with no origin (e.g. server-to-server, mobile, postman, curl)
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
@@ -34,9 +38,9 @@ app.use(
         new ApiError(403, `CORS policy violation: Origin "${origin}" is not authorized.`)
       );
     },
+    credentials: true, // Enables sending and receiving HttpOnly cookies across origins
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false, // Do not enable unless required by specific auth workflows
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'],
   })
 );
 
