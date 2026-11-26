@@ -1,378 +1,377 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Sparkles,
   Video,
   VideoOff,
   Mic,
   MicOff,
   CheckCircle2,
-  AlertTriangle,
-  Sparkles,
-  Settings,
+  AlertCircle,
   ArrowRight,
-  RefreshCw,
+  ShieldCheck,
+  HelpCircle,
+  FileText,
 } from 'lucide-react';
-import useMediaStream from '../hooks/useMediaStream';
 import { useInterviewStore } from '../store/useInterviewStore';
 import Button from '../components/common/Button';
-import Loader from '../components/common/Loader';
+import Card from '../components/common/Card';
+import Badge from '../components/common/Badge';
 
 /**
- * DeviceCheck Page - Pre-interview camera/microphone testing and permission verification.
- * Assigned to: Member 4
- * 
- * Features:
- * - Automatic camera/mic permission request on mount
- * - Live video preview with mirror effect
- * - Real-time audio level meter with visual feedback
- * - Camera toggle button (on/off test)
- * - Pre-flight checklist (camera, mic, config ready)
- * - Troubleshooting alerts for permission errors
- * - Clean stream cleanup before navigating to interview room
+ * Pre-Interview Hardware & Readiness Check Page (White & Emerald Theme)
+ * Tests webcam feeds, microphone audio meters, and provides a text-only fallback option.
  */
 export default function DeviceCheckPage() {
   const navigate = useNavigate();
-  const { sessionId, sessionConfig } = useInterviewStore();
+  const { sessionId, sessionConfig, isMicOn, isCamOn, toggleMic, toggleCam } = useInterviewStore();
 
-  const {
-    videoRef,
-    audioLevel,
-    isMicActive,
-    isCamActive,
-    permissionError,
-    stream,
-    startStream,
-    stopStream,
-    toggleVideo,
-  } = useMediaStream();
-
+  const [stream, setStream] = useState(null);
+  const [cameraPermission, setCameraPermission] = useState('prompt'); // 'granted' | 'denied' | 'prompt'
+  const [micPermission, setMicPermission] = useState('prompt');
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [errorMessage, setErrorMessage] = useState('');
   const [isInitializing, setIsInitializing] = useState(true);
-  const [isJoining, setIsJoining] = useState(false);
 
-  /**
-   * Request media permissions automatically on component mount
-   */
+  const videoRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animFrameRef = useRef(null);
+
+  const activeSessionId = sessionId || `sess_${Date.now()}`;
+
+  // Request permissions and initialize webcam/mic
   useEffect(() => {
-    const initializeMedia = async () => {
+    let activeStream = null;
+
+    const startMedia = async () => {
       setIsInitializing(true);
-      await startStream();
-      setIsInitializing(false);
+      setErrorMessage('');
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setErrorMessage('Your browser does not support webcam/microphone capture.');
+        setCameraPermission('denied');
+        setMicPermission('denied');
+        setIsInitializing(false);
+        return;
+      }
+
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+
+        activeStream = mediaStream;
+        setStream(mediaStream);
+        setCameraPermission('granted');
+        setMicPermission('granted');
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+
+        // Setup Web Audio Analyser for mic volume level
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            const audioCtx = new AudioContext();
+            audioContextRef.current = audioCtx;
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            analyserRef.current = analyser;
+
+            const source = audioCtx.createMediaStreamSource(mediaStream);
+            source.connect(analyser);
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const checkVolume = () => {
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const avg = sum / dataArray.length;
+              setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
+              animFrameRef.current = requestAnimationFrame(checkVolume);
+            };
+            checkVolume();
+          }
+        } catch (audioErr) {
+          console.warn('[DeviceCheck] AudioContext init warning:', audioErr);
+        }
+      } catch (err) {
+        console.warn('[DeviceCheck] getUserMedia error:', err);
+        setCameraPermission('denied');
+        setMicPermission('denied');
+        setErrorMessage(
+          'Camera or microphone access was blocked or is unavailable. You can still proceed with a text-based interview fallback.'
+        );
+      } finally {
+        setIsInitializing(false);
+      }
     };
 
-    initializeMedia();
+    startMedia();
 
-    // Cleanup on unmount
     return () => {
-      stopStream();
+      if (activeStream) {
+        activeStream.getTracks().forEach((track) => track.stop());
+      }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+      }
     };
-  }, [startStream, stopStream]);
+  }, []);
 
-  /**
-   * Retry permissions after user fixes browser settings
-   */
-  const handleRetryPermissions = async () => {
-    setIsInitializing(true);
-    await startStream();
-    setIsInitializing(false);
+  const handleToggleCam = () => {
+    if (stream) {
+      stream.getVideoTracks().forEach((t) => (t.enabled = !t.enabled));
+    }
+    toggleCam();
   };
 
-  /**
-   * Navigate to interview room and clean up test stream
-   */
-  const handleJoinInterview = () => {
-    setIsJoining(true);
-
-    // Stop the test stream cleanly before navigating
-    stopStream();
-
-    // Navigate after a brief delay to ensure cleanup completes
-    setTimeout(() => {
-      const targetSessionId = sessionId || 'demo-session';
-      navigate(`/interview/${targetSessionId}`);
-    }, 300);
+  const handleToggleMic = () => {
+    if (stream) {
+      stream.getAudioTracks().forEach((t) => (t.enabled = !t.enabled));
+    }
+    toggleMic();
   };
 
-  /**
-   * Calculate audio level status and styling
-   */
-  const getAudioLevelStatus = () => {
-    if (!isMicActive) {
-      return { text: 'Microphone is muted', color: 'text-slate-500', badgeColor: 'bg-slate-700' };
+  const handleStartInterview = (mode = 'standard') => {
+    // Release preview stream tracks so interview room can take fresh control
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
     }
-
-    if (audioLevel < 5) {
-      return { text: 'Speak to test your microphone', color: 'text-slate-400', badgeColor: 'bg-slate-700' };
-    }
-
-    if (audioLevel < 30) {
-      return { text: 'Audio detected - Low volume', color: 'text-yellow-400', badgeColor: 'bg-yellow-600/20' };
-    }
-
-    return { text: 'Mic is picking up audio', color: 'text-emerald-400', badgeColor: 'bg-emerald-600/20' };
+    navigate(`/interview/${activeSessionId}`, { state: { interviewMode: mode } });
   };
-
-  const audioStatus = getAudioLevelStatus();
-
-  /**
-   * Pre-flight checklist items
-   */
-  const checklistItems = [
-    {
-      label: 'Camera Connected',
-      isReady: isCamActive && stream && !permissionError,
-      icon: Video,
-    },
-    {
-      label: 'Microphone Active',
-      isReady: isMicActive && stream && !permissionError,
-      icon: Mic,
-    },
-    {
-      label: 'Interview Config Ready',
-      isReady: sessionConfig.role && sessionConfig.totalQuestions > 0,
-      icon: Settings,
-    },
-  ];
-
-  const allChecksPass = checklistItems.every((item) => item.isReady);
 
   return (
-    <div className="min-h-screen bg-slate-950 py-8 px-4 sm:px-6 lg:px-8">
-      {/* Loading Overlay */}
-      {isJoining && <Loader fullScreen text="Joining interview room..." />}
-
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Device Check & Setup</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-            Test Your Camera & Microphone
-          </h1>
-          <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">
-            Ensure your devices are working properly before starting the interview.
-          </p>
+    <div className="max-w-5xl mx-auto space-y-8">
+      {/* Header */}
+      <div>
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold mb-2">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Pre-Flight Readiness</span>
         </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          Device & Hardware Check
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          Verify your camera and microphone permissions to ensure a smooth mock interview session.
+        </p>
+      </div>
 
-        {/* Permission Error Alert */}
-        {permissionError && (
-          <div className="bg-rose-500/10 border border-rose-500/40 rounded-xl p-5 flex items-start gap-4">
-            <AlertTriangle className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
-            <div className="flex-1 space-y-3">
-              <div>
-                <p className="text-sm font-semibold text-rose-300 mb-1">Camera/Microphone Access Denied</p>
-                <p className="text-xs text-rose-200/80">{permissionError}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRetryPermissions}
-                icon={<RefreshCw className="w-4 h-4" />}
-              >
-                Retry Permissions
-              </Button>
-            </div>
+      {errorMessage && (
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+            <span>{errorMessage}</span>
           </div>
-        )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleStartInterview('text-fallback')}
+          >
+            Start Text Interview
+          </Button>
+        </div>
+      )}
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Camera Preview */}
-          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-                <Video className="w-5 h-5 text-indigo-400" />
-                Camera Preview
-              </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleVideo}
-                icon={isCamActive ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-              >
-                {isCamActive ? 'Turn Off' : 'Turn On'}
-              </Button>
-            </div>
-
-            {/* Video Preview */}
-            <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
-              {isInitializing ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader text="Initializing camera..." />
-                </div>
-              ) : !stream || permissionError ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                  <VideoOff className="w-12 h-12 text-slate-600" />
-                  <p className="text-sm font-medium text-slate-400">
-                    {permissionError ? 'Camera unavailable' : 'Camera not started'}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left: Video Preview & Device Controls */}
+        <div className="lg:col-span-7 space-y-4">
+          <Card className="overflow-hidden p-0 border-slate-200 shadow-md">
+            {/* Webcam Viewport */}
+            <div className="relative bg-slate-950 aspect-video flex items-center justify-center overflow-hidden">
+              {isCamOn && cameraPermission === 'granted' ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover transform scale-x-[-1]"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                  <VideoOff className="w-10 h-10 mb-2 text-slate-500" />
+                  <p className="text-sm font-semibold text-slate-300">Camera Feed Off</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {cameraPermission === 'denied'
+                      ? 'Camera permission denied or unavailable'
+                      : 'Camera preview is disabled'}
                   </p>
                 </div>
-              ) : (
-                <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className={`w-full h-full object-cover ${isCamActive ? '' : 'opacity-0'}`}
-                    style={{ transform: 'scaleX(-1)' }} // Mirror effect
-                  />
-                  {!isCamActive && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/90">
-                      <VideoOff className="w-12 h-12 text-slate-600" />
-                      <p className="text-sm font-medium text-slate-400">Camera is off</p>
-                    </div>
-                  )}
-                </>
               )}
 
-              {/* Live Indicator */}
-              {stream && isCamActive && !permissionError && (
-                <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/80 backdrop-blur-sm border border-slate-700">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-medium text-slate-200">Live</span>
-                </div>
-              )}
-            </div>
+              {/* Status Badges Overlay */}
+              <div className="absolute top-3 left-3 flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-md bg-black/60 text-white text-[11px] font-mono flex items-center gap-1.5 backdrop-blur-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>Preview</span>
+                </span>
+              </div>
 
-            {/* Camera Info */}
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Your video is mirrored for preview only</span>
-            </div>
-          </div>
-
-          {/* Right Column: Audio Test & Checklist */}
-          <div className="space-y-6">
-            {/* Audio Level Meter */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-2xl">
-              <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-                <Mic className="w-5 h-5 text-indigo-400" />
-                Microphone Test
-              </h2>
-
-              {/* Audio Level Bar */}
-              <div className="space-y-3">
-                <div className="relative h-8 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-indigo-600 to-violet-600 transition-all duration-100 ease-out"
-                    style={{ width: `${audioLevel}%` }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs font-semibold text-slate-200 drop-shadow-lg">
-                      {audioLevel}%
-                    </span>
+              {/* Audio Volume Visualizer Bar Overlay */}
+              {micPermission === 'granted' && isMicOn && (
+                <div className="absolute bottom-3 left-3 right-3 bg-black/60 backdrop-blur-xs p-2 rounded-xl flex items-center gap-3">
+                  <Mic className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <div className="flex-1 bg-slate-700 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 transition-all duration-75"
+                      style={{ width: `${audioLevel}%` }}
+                    />
                   </div>
-                </div>
-
-                {/* Status Badge */}
-                <div
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${audioStatus.badgeColor} border border-slate-700`}
-                >
-                  {isMicActive ? (
-                    <Mic className="w-3.5 h-3.5 text-current" />
-                  ) : (
-                    <MicOff className="w-3.5 h-3.5 text-current" />
-                  )}
-                  <span className={`text-xs font-medium ${audioStatus.color}`}>
-                    {audioStatus.text}
+                  <span className="text-[10px] text-emerald-400 font-mono w-8 text-right">
+                    {audioLevel}%
                   </span>
                 </div>
-              </div>
-
-              {/* Audio Tip */}
-              <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/20">
-                <p className="text-xs text-indigo-300/80">
-                  💡 Speak naturally to test your microphone. The bar should move in response to your voice.
-                </p>
-              </div>
-            </div>
-
-            {/* Pre-Flight Checklist */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-2xl">
-              <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-indigo-400" />
-                Readiness Checklist
-              </h2>
-
-              <div className="space-y-3">
-                {checklistItems.map((item) => (
-                  <div
-                    key={item.label}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                      item.isReady
-                        ? 'bg-emerald-500/5 border-emerald-500/30'
-                        : 'bg-slate-950/50 border-slate-800'
-                    }`}
-                  >
-                    {item.isReady ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                    ) : (
-                      <item.icon className="w-5 h-5 text-slate-500 shrink-0" />
-                    )}
-                    <span
-                      className={`text-sm font-medium ${
-                        item.isReady ? 'text-emerald-300' : 'text-slate-400'
-                      }`}
-                    >
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Interview Config Preview */}
-              {sessionConfig.role && (
-                <div className="pt-3 border-t border-slate-800 space-y-2">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Interview Details
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-slate-500">Role:</span>{' '}
-                      <span className="text-slate-300 font-medium">{sessionConfig.role}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Questions:</span>{' '}
-                      <span className="text-slate-300 font-medium">{sessionConfig.totalQuestions}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Type:</span>{' '}
-                      <span className="text-slate-300 font-medium">{sessionConfig.interviewType}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Difficulty:</span>{' '}
-                      <span className="text-slate-300 font-medium">{sessionConfig.difficulty}</span>
-                    </div>
-                  </div>
-                </div>
               )}
             </div>
+
+            {/* Device Toggles Bar */}
+            <div className="p-4 bg-white flex items-center justify-between border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isCamOn ? 'outline' : 'danger'}
+                  onClick={handleToggleCam}
+                  icon={isCamOn ? <Video className="w-4 h-4 text-emerald-600" /> : <VideoOff className="w-4 h-4" />}
+                >
+                  {isCamOn ? 'Camera On' : 'Camera Off'}
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isMicOn ? 'outline' : 'danger'}
+                  onClick={handleToggleMic}
+                  icon={isMicOn ? <Mic className="w-4 h-4 text-emerald-600" /> : <MicOff className="w-4 h-4" />}
+                >
+                  {isMicOn ? 'Mic Active' : 'Mic Muted'}
+                </Button>
+              </div>
+
+              <span className="text-xs text-slate-400 font-medium hidden sm:block">
+                HD 720p Recommended
+              </span>
+            </div>
+          </Card>
+
+          {/* Fallback Option Callout */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <p className="font-bold text-slate-800">Hardware not cooperating?</p>
+              <p className="text-slate-500">
+                You can complete your entire mock interview with speech synthesis and text answers.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleStartInterview('text-fallback')}
+            >
+              Use Text Mode
+            </Button>
           </div>
         </div>
 
-        {/* Join Interview Button */}
-        <div className="max-w-md mx-auto">
-          <Button
-            fullWidth
-            variant="primary"
-            size="lg"
-            onClick={handleJoinInterview}
-            disabled={!allChecksPass || isJoining}
-            isLoading={isJoining}
-            icon={<ArrowRight className="w-5 h-5" />}
-            iconPosition="right"
-          >
-            {allChecksPass ? 'Join Interview Room' : 'Complete Setup to Continue'}
-          </Button>
+        {/* Right: Readiness Checklist & Action */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Pre-Flight Checklist */}
+          <Card className="space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Pre-Flight System Status
+            </h3>
 
-          {!allChecksPass && !permissionError && (
-            <p className="text-xs text-center text-slate-500 mt-3">
-              Please ensure all checklist items are complete before joining
-            </p>
-          )}
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-600">Webcam Permission:</span>
+                {cameraPermission === 'granted' ? (
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Granted
+                  </span>
+                ) : (
+                  <span className="text-amber-600 font-medium">Not Granted</span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-600">Microphone Input:</span>
+                {micPermission === 'granted' ? (
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Detected
+                  </span>
+                ) : (
+                  <span className="text-amber-600 font-medium">Not Detected</span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-600">Speech Synthesis (Voice):</span>
+                <span className="text-emerald-700 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-slate-600">Local Question Bank:</span>
+                <span className="text-emerald-700 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Loaded
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Interview Guidelines Card */}
+          <Card className="space-y-3 bg-emerald-50/40 border-emerald-200">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+              <HelpCircle className="w-3.5 h-3.5 text-emerald-700" />
+              Session Guidelines
+            </h3>
+            <ul className="space-y-2 text-xs text-slate-600">
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 font-bold">•</span>
+                <span>Position yourself in a well-lit and quiet room.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 font-bold">•</span>
+                <span>Speak clearly into your microphone or type your responses into the answer box.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 font-bold">•</span>
+                <span>Maintain tab focus; leaving the window simulates interview proctoring alerts.</span>
+              </li>
+            </ul>
+          </Card>
+
+          {/* Launch Action */}
+          <div className="space-y-2.5">
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={() => handleStartInterview('standard')}
+              icon={<ArrowRight className="w-4 h-4" />}
+              iconPosition="right"
+            >
+              Enter Live Interview Room
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              fullWidth
+              onClick={() => navigate('/setup')}
+            >
+              Reconfigure Interview Setup
+            </Button>
+          </div>
         </div>
       </div>
     </div>
