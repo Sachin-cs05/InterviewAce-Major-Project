@@ -1,9 +1,12 @@
 /**
+ * InterviewAce Utility Formatters (White & Emerald Theme)
+ */
+
+/**
  * Formats a duration in seconds into a clean MM:SS or HH:MM:SS string.
  * Example: 65 -> "01:05", 125 -> "02:05", 3661 -> "01:01:01"
- * 
- * @param {number|string} seconds - Total duration in seconds
- * @returns {string} Formatted duration string
+ * @param {number|string} seconds
+ * @returns {string}
  */
 export const formatDuration = (seconds) => {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -22,10 +25,9 @@ export const formatDuration = (seconds) => {
 /**
  * Formats an ISO date string or timestamp into a clean, human-readable date.
  * Example: "2026-11-25T16:30:00.000Z" -> "Nov 25, 2026"
- * 
- * @param {string|Date} isoString - Date string or Date object
- * @param {Object} [options] - Optional Intl.DateTimeFormat options
- * @returns {string} Formatted date string
+ * @param {string|Date} isoString
+ * @param {Object} [options]
+ * @returns {string}
  */
 export const formatDate = (isoString, options = {}) => {
   if (!isoString) return 'N/A';
@@ -48,12 +50,7 @@ export const formatDate = (isoString, options = {}) => {
 
 /**
  * Returns Tailwind CSS badge classes (background, text, and border)
- * corresponding to candidate interview evaluation scores.
- * 
- * Scoring thresholds:
- * - High (>= 80): Emerald (Green) badge
- * - Medium (60 - 79): Amber (Yellow/Orange) badge
- * - Low (< 60): Rose (Red) badge
+ * corresponding to candidate interview evaluation scores (White & Emerald Light Theme).
  * 
  * @param {number|string} score - Score value between 0 and 100
  * @returns {string} Tailwind CSS class string
@@ -62,38 +59,35 @@ export const getScoreBadgeColor = (score) => {
   const numericScore = Number(score) || 0;
 
   if (numericScore >= 80) {
-    return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
   }
   if (numericScore >= 60) {
-    return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+    return 'bg-amber-50 text-amber-700 border border-amber-200';
   }
-  return 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+  return 'bg-rose-50 text-rose-700 border border-rose-200';
 };
 
 /**
  * Returns Tailwind CSS text color class based on score.
- * Example: 85 -> "text-emerald-400", 72 -> "text-amber-400", 45 -> "text-rose-400"
- * 
+ * Example: 85 -> "text-emerald-600", 72 -> "text-amber-600", 45 -> "text-rose-600"
  * @param {number|string} score
  * @returns {string}
  */
 export const getScoreTextColor = (score) => {
   const numericScore = Number(score) || 0;
-  if (numericScore >= 80) return 'text-emerald-400';
-  if (numericScore >= 60) return 'text-amber-400';
-  return 'text-rose-400';
+  if (numericScore >= 80) return 'text-emerald-600';
+  if (numericScore >= 60) return 'text-amber-600';
+  return 'text-rose-600';
 };
 
 /**
  * Returns Tailwind CSS background color class for progress bars based on score.
- * Example: 85 -> "bg-emerald-500", 72 -> "bg-amber-500", 45 -> "bg-rose-500"
- * 
  * @param {number|string} score
  * @returns {string}
  */
 export const getScoreProgressColor = (score) => {
   const numericScore = Number(score) || 0;
-  if (numericScore >= 80) return 'bg-emerald-500';
+  if (numericScore >= 80) return 'bg-emerald-600';
   if (numericScore >= 60) return 'bg-amber-500';
   return 'bg-rose-500';
 };
@@ -101,7 +95,6 @@ export const getScoreProgressColor = (score) => {
 /**
  * Formats a numeric score into a percentage string.
  * Example: 87.4 -> "87%"
- * 
  * @param {number|string} score
  * @returns {string}
  */

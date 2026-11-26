@@ -1,11 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Bot, UserPlus, ArrowRight, AlertCircle } from 'lucide-react';
+import {
+  Sparkles,
+  UserPlus,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
+  Mail,
+  Lock,
+  User,
+  Briefcase,
+} from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import Button from '../components/common/Button';
+import Input from '../components/common/Input';
+import Select from '../components/common/Select';
 
 /**
- * Placeholder component for the Candidate Sign Up Page.
- * Assigned to: Member 2
+ * Split-screen Signup Page (White & Emerald Theme)
  */
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -14,113 +26,203 @@ export default function SignupPage() {
   const [name, setName] = useState('Alex Johnson');
   const [email, setEmail] = useState('alex@example.com');
   const [password, setPassword] = useState('password123');
-  const [targetRole, setTargetRole] = useState('SDE-1');
+  const [confirmPassword, setConfirmPassword] = useState('password123');
+  const [targetRole, setTargetRole] = useState('Software Engineer');
+  const [agreeTerms, setAgreeTerms] = useState(true);
+  const [validationError, setValidationError] = useState('');
+
+  const roleOptions = [
+    'Software Engineer',
+    'Frontend Developer',
+    'Backend Developer',
+    'Full Stack MERN',
+    'Data Analyst',
+    'Java Developer',
+    'Python Developer',
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setValidationError('');
+
+    if (!name || !email || !password) {
+      setValidationError('Please fill out all required fields.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setValidationError('Passwords do not match.');
+      return;
+    }
+
+    if (!agreeTerms) {
+      setValidationError('Please accept the platform terms to continue.');
+      return;
+    }
+
     try {
       await signup({ name, email, password, targetRole });
       navigate('/dashboard', { replace: true });
     } catch {
-      // Handled in store
+      // error handled in store
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 relative">
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/10 blur-[100px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center">
+      <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen">
+        {/* Left Side: Branding (Desktop) */}
+        <div className="hidden lg:flex lg:col-span-5 bg-emerald-600 text-white p-12 flex-col justify-between relative overflow-hidden">
+          <div className="absolute -top-12 -left-12 w-64 h-64 bg-emerald-500 rounded-full opacity-40 blur-xl" />
+          <div className="absolute -bottom-16 -right-16 w-80 h-80 bg-emerald-700 rounded-full opacity-40 blur-2xl" />
 
-      <div className="relative z-10 w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
-        {/* Ownership Badge */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium">
-            <Bot className="w-3.5 h-3.5" />
-            <span>Assigned: Member 2</span>
+          <div className="relative z-10 flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-white text-emerald-700 flex items-center justify-center shadow-md font-bold">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <span className="text-2xl font-bold tracking-tight text-white">
+                InterviewAce
+              </span>
+            </Link>
           </div>
-          <span className="text-xs text-slate-400 font-mono">/signup</span>
+
+          <div className="relative z-10 space-y-6 my-auto py-12">
+            <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight">
+              Start your mock interview journey today.
+            </h2>
+            <p className="text-emerald-100 text-sm leading-relaxed max-w-sm">
+              Create your account in seconds. Test real questions from industry rubrics and track your
+              progress across multiple technical tracks.
+            </p>
+            <div className="space-y-3 pt-2 text-xs text-emerald-100 font-medium">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                <span>Simulated college placement assessment</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                <span>Zero backend server installation needed</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                <span>Private local browser session storage</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 text-xs text-emerald-200 border-t border-emerald-500/40 pt-4">
+            College Major Project Demonstration • Student Prototype
+          </div>
         </div>
 
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-white tracking-tight">Create Your Account</h2>
-          <p className="text-xs text-slate-400 mt-1">Set up your profile to start AI mock interviews</p>
+        {/* Right Side: Signup Form */}
+        <div className="lg:col-span-7 flex items-center justify-center p-6 sm:p-12">
+          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-2xl p-8 sm:p-10 shadow-lg shadow-slate-200/50">
+            <div className="mb-6">
+              <Link to="/" className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-600 mb-4 hover:underline">
+                ← Back to Home
+              </Link>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                Create Candidate Account
+              </h1>
+              <p className="text-xs text-slate-500 mt-1">
+                Configure your candidate profile to begin practicing mock interviews.
+              </p>
+            </div>
+
+            {(error || validationError) && (
+              <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{validationError || error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                label="Full Name"
+                type="text"
+                name="name"
+                placeholder="Jane Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                icon={<User className="w-4 h-4" />}
+                required
+              />
+
+              <Input
+                label="Email Address"
+                type="email"
+                name="email"
+                placeholder="jane@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                icon={<Mail className="w-4 h-4" />}
+                required
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Password"
+                  type="password"
+                  name="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  required
+                />
+                <Input
+                  label="Confirm Password"
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  required
+                />
+              </div>
+
+              <Select
+                label="Target Career Track"
+                name="targetRole"
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
+                options={roleOptions}
+              />
+
+              <label className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer pt-1 select-none">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>
+                  I understand this is a simulated demo platform for academic evaluation purposes.
+                </span>
+              </label>
+
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                isLoading={isLoading}
+                icon={<UserPlus className="w-4 h-4" />}
+              >
+                Create Account
+              </Button>
+            </form>
+
+            <p className="text-center text-xs text-slate-500 mt-6">
+              Already have an account?{' '}
+              <Link to="/login" className="text-emerald-600 hover:text-emerald-700 font-semibold hover:underline">
+                Sign In
+              </Link>
+            </p>
+          </div>
         </div>
-
-        {error && (
-          <div className="mb-5 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Full Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-              placeholder="Candidate Name"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-              placeholder="you@example.com"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 placeholder-slate-400 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Target Career Role</label>
-            <select
-              value={targetRole}
-              onChange={(e) => setTargetRole(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-            >
-              <option value="SDE-1">SDE-1 (Software Development Engineer)</option>
-              <option value="Frontend Engineer">Frontend Engineer (React / Next.js)</option>
-              <option value="Backend Engineer">Backend Engineer (Node / Go / Java)</option>
-              <option value="Full Stack Engineer">Full Stack Engineer</option>
-              <option value="AI / ML Engineer">AI / ML Engineer</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-indigo-600/20"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>{isLoading ? 'Creating Account...' : 'Complete Registration'}</span>
-            <ArrowRight className="w-4 h-4 ml-1" />
-          </button>
-        </form>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Already registered?{' '}
-          <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
-            Sign In
-          </Link>
-        </p>
       </div>
     </div>
   );

@@ -1,154 +1,361 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Bot, PlayCircle, Clock, Award, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  Sparkles,
+  PlayCircle,
+  Award,
+  Clock,
+  CheckCircle2,
+  Code2,
+  Users,
+  Target,
+  Briefcase,
+  ArrowRight,
+  ChevronRight,
+  TrendingUp,
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 import { useAuthStore } from '../store/useAuthStore';
 import { getPastInterviews } from '../services/interviewService';
+import Button from '../components/common/Button';
+import Card from '../components/common/Card';
+import Badge from '../components/common/Badge';
+import EmptyState from '../components/common/EmptyState';
+import Loader from '../components/common/Loader';
+import { formatDate, getScoreBadgeColor, formatDuration } from '../utils/formatters';
 
 /**
- * Placeholder component for the Candidate Dashboard & Past Sessions.
- * Assigned to: Member 3
+ * Modern Student Dashboard Page (White & Emerald Light Theme)
  */
 export default function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const [pastInterviews, setPastInterviews] = useState([]);
+  const [interviews, setInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Load interviews from localStorage or mock service
   useEffect(() => {
     let isMounted = true;
-    getPastInterviews()
-      .then((data) => {
+    const fetchHistory = async () => {
+      try {
+        const local = localStorage.getItem('interviewace-history');
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (isMounted) {
+              setInterviews(parsed);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        const data = await getPastInterviews();
         if (isMounted) {
-          setPastInterviews(data);
+          setInterviews(data);
+          // Seed localStorage so persistence is established
+          localStorage.setItem('interviewace-history', JSON.stringify(data));
           setLoading(false);
         }
-      })
-      .catch(() => {
+      } catch {
         if (isMounted) setLoading(false);
-      });
+      }
+    };
+
+    fetchHistory();
     return () => {
       isMounted = false;
     };
   }, []);
 
+  // Compute live statistics
+  const totalInterviews = interviews.length;
+  const completedInterviews = interviews.filter((i) => i.status === 'COMPLETED').length;
+  const averageScore = totalInterviews > 0
+    ? Math.round(interviews.reduce((acc, curr) => acc + (Number(curr.overallScore) || 0), 0) / totalInterviews)
+    : 0;
+  const totalPracticeMinutes = interviews.reduce(
+    (acc, curr) => acc + (Number(curr.durationMinutes) || 20),
+    0
+  );
+
+  // Prepare chart data for performance trend
+  const chartData = interviews.map((item, index) => ({
+    name: `Session ${index + 1}`,
+    score: item.overallScore,
+    role: item.role,
+  }));
+
+  const quickTracks = [
+    {
+      type: 'Technical',
+      title: 'Technical Interview',
+      desc: 'Coding concepts, DSA, APIs & System Design',
+      icon: Code2,
+    },
+    {
+      type: 'HR',
+      title: 'HR Interview',
+      desc: 'Culture fit, introductions & communication',
+      icon: Users,
+    },
+    {
+      type: 'Behavioral',
+      title: 'Behavioral (STAR)',
+      desc: 'Teamwork, conflict resolution & project stories',
+      icon: Briefcase,
+    },
+    {
+      type: 'Mixed',
+      title: 'Mixed Comprehensive',
+      desc: 'Full recruitment simulation (Tech + HR)',
+      icon: Target,
+    },
+  ];
+
+  const handleLaunchTrack = (trackType) => {
+    navigate('/setup', { state: { preselectedTrack: trackType } });
+  };
+
   return (
     <div className="space-y-8">
-      {/* Header with Ownership Badge */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-2">
-            <Bot className="w-3.5 h-3.5" />
-            <span>Assigned: Member 3 (Dashboard & Session Management)</span>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">
+      {/* 1. Welcome Greeting Banner */}
+      <div className="bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 rounded-3xl p-6 sm:p-8 text-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="space-y-2 relative z-10 max-w-xl">
+          <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 text-white border border-white/30 inline-block">
+            Student Preparation Portal
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Welcome back, {user?.name || 'Candidate'}!
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Target Role:{' '}
-            <span className="text-indigo-400 font-mono font-medium">
-              {user?.targetRole || 'SDE-1'}
-            </span>
+          <p className="text-xs sm:text-sm text-emerald-100 leading-relaxed">
+            Ready to sharpen your skills? Pick an interview track, configure your question count,
+            and practice with AI interviewer Ace.
           </p>
         </div>
 
-        {/* Working Navigation to Next Step */}
-        <button
-          onClick={() => navigate('/setup')}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm shadow-lg shadow-indigo-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] self-start sm:self-auto cursor-pointer"
-        >
-          <PlayCircle className="w-4 h-4" />
-          <span>Start New Interview Setup</span>
-          <ArrowRight className="w-4 h-4 ml-1" />
-        </button>
-      </div>
-
-      {/* Metrics Highlights */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Total Practice Sessions</span>
-            <Clock className="w-4 h-4 text-indigo-400" />
-          </div>
-          <p className="text-2xl font-bold text-white mt-2">
-            {loading ? '...' : pastInterviews.length}
-          </p>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Average Readiness Score</span>
-            <Award className="w-4 h-4 text-emerald-400" />
-          </div>
-          <p className="text-2xl font-bold text-white mt-2">
-            {loading
-              ? '...'
-              : `${Math.round(
-                  pastInterviews.reduce((acc, curr) => acc + curr.overallScore, 0) /
-                    (pastInterviews.length || 1)
-                )}%`}
-          </p>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Completed Technicals</span>
-            <CheckCircle2 className="w-4 h-4 text-purple-400" />
-          </div>
-          <p className="text-2xl font-bold text-white mt-2">
-            {loading ? '...' : pastInterviews.filter((i) => i.status === 'COMPLETED').length}
-          </p>
+        <div className="relative z-10 shrink-0">
+          <Button
+            variant="outline"
+            size="md"
+            className="bg-white text-emerald-700 hover:bg-emerald-50 border-white shadow-sm font-bold"
+            onClick={() => navigate('/setup')}
+            icon={<PlayCircle className="w-4 h-4" />}
+          >
+            Start New Interview
+          </Button>
         </div>
       </div>
 
-      {/* Past Interviews List */}
-      <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-white">Recent Interview Sessions</h2>
-          <span className="text-xs text-slate-400">Mock Data Contract Active</span>
+      {/* 2. Key Statistics Cards (4 Cards) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <Card className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+            <PlayCircle className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase">Total Interviews</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalInterviews}</p>
+          </div>
+        </Card>
+
+        <Card className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+            <Award className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase">Average Score</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-0.5">
+              {averageScore > 0 ? `${averageScore}%` : 'N/A'}
+            </p>
+          </div>
+        </Card>
+
+        <Card className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase">Completed</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-0.5">{completedInterviews}</p>
+          </div>
+        </Card>
+
+        <Card className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+            <Clock className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase">Practice Time</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-0.5">
+              {totalPracticeMinutes} mins
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      {/* 3. Quick Interview Actions */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              Quick Interview Launch
+            </h2>
+            <p className="text-xs text-slate-500">
+              Select a specialized track to jump right into interview setup.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {quickTracks.map((track) => {
+            const Icon = track.icon;
+            return (
+              <div
+                key={track.type}
+                onClick={() => handleLaunchTrack(track.type)}
+                className="bg-white border border-slate-200/80 hover:border-emerald-500 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-sm">{track.title}</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{track.desc}</p>
+                </div>
+                <div className="pt-4 flex items-center gap-1 text-xs font-bold text-emerald-600 group-hover:translate-x-1 transition-transform">
+                  <span>Configure Track</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. Performance Trend Chart (Recharts) */}
+      {chartData.length > 1 && (
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-600" />
+                Performance Progression Trend
+              </h2>
+              <p className="text-xs text-slate-500">Scores across completed mock interviews</p>
+            </div>
+            <Badge variant="emerald">Live Local Data</Badge>
+          </div>
+
+          <div className="h-64 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="emeraldGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#059669" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#059669" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                <XAxis dataKey="name" stroke="#94A3B8" fontSize={11} tickLine={false} />
+                <YAxis domain={[0, 100]} stroke="#94A3B8" fontSize={11} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#FFFFFF',
+                    borderColor: '#E2E8F0',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  }}
+                  formatter={(val) => [`${val}%`, 'Overall Score']}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="score"
+                  stroke="#059669"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#emeraldGradient)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      {/* 5. Recent Interviews List */}
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Recent Interview Sessions</h2>
+            <p className="text-xs text-slate-500">View past recordings, answers, and scores</p>
+          </div>
+          <Link
+            to="/history"
+            className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+          >
+            <span>View All History</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
 
         {loading ? (
-          <div className="py-8 text-center text-sm text-slate-400">Loading sessions...</div>
+          <Loader text="Loading your interview records..." />
+        ) : interviews.length === 0 ? (
+          <EmptyState
+            title="No Interviews Yet"
+            description="You have not completed any mock sessions yet. Start your first session to receive your evaluation."
+            actionLabel="Start Your First Interview"
+            onAction={() => navigate('/setup')}
+          />
         ) : (
-          <div className="space-y-3">
-            {pastInterviews.map((session) => (
+          <div className="divide-y divide-slate-100">
+            {interviews.slice(0, 4).map((session) => (
               <div
                 key={session.sessionId}
-                className="flex items-center justify-between p-4 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors"
+                className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 p-2 rounded-xl transition-colors"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-slate-200">{session.role}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-indigo-400 border border-slate-700">
-                      {session.difficulty}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                      {session.interviewType}
-                    </span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-slate-900">{session.role}</span>
+                    <Badge variant="emerald">{session.interviewType}</Badge>
+                    <Badge variant="slate">{session.difficulty}</Badge>
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {new Date(session.date).toLocaleDateString()} • {session.durationMinutes} mins •{' '}
-                    {session.totalQuestions} questions
+                  <p className="text-xs text-slate-500">
+                    {formatDate(session.date)} • {session.durationMinutes || 24} mins •{' '}
+                    {session.totalQuestions || 5} Questions
                   </p>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-emerald-400">{session.overallScore}%</div>
-                    <div className="text-[10px] text-slate-400 uppercase font-mono">Score</div>
-                  </div>
-                  <button
-                    onClick={() => navigate(`/report/${session.sessionId}`)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${getScoreBadgeColor(
+                      session.overallScore
+                    )}`}
                   >
-                    View Report
-                  </button>
+                    {session.overallScore}% Score
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/report/${session.sessionId}`)}
+                  >
+                    View Result
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
