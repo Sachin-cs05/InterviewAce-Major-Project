@@ -1,70 +1,17 @@
-<<<<<<< HEAD
-# InterviewAce - AI Mock Interview Platform
-
-An AI-powered mock interview application that helps candidates practice technical interviews with real-time feedback and performance analytics.
-
-## 🚀 Features
-
-- **AI-Driven Interviews** - Practice with an intelligent AI interviewer
-- **Real-time Interaction** - Live video/audio during mock interviews  
-- **Device Testing** - Pre-interview camera and microphone checks
-- **Performance Analytics** - Detailed feedback reports after each session
-- **Session History** - Track your progress across multiple interviews
-- **Role-Specific Practice** - Customize interviews for different positions
-
-## 🛠️ Tech Stack
-
-- **Frontend**: React 19.3 + Vite 8
-- **Styling**: Tailwind CSS 4
-- **State Management**: Zustand
-- **Routing**: React Router v7
-- **Icons**: Lucide React
-
-## 📦 Installation
-
-```bash
-# Install dependencies
-npm install
-
-# Create environment file
-cp .env.example .env
-
-# Start development server
-npm run dev
-```
-
-## 🔧 Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-
-## 🌐 Environment Variables
-
-```
-VITE_API_URL=http://localhost:5000/api
-```
-
-## 📝 License
-
-This project is part of a major academic project.
-
----
-
-Made with ❤️ for interview preparation
-=======
 # InterviewAce — AI Mock Interview Preparation Platform
 
 > **Final-Year College Major Project**  
-> An AI-powered mock interview web application built with **React 19**, **Vite**, **Tailwind CSS v4**, **React Router DOM v7**, **Zustand**, and modern **Web Browser APIs**.
+> An AI-powered mock interview web application built with **React 19**, **Vite**, **Tailwind CSS v4**, **Node.js**, **Express**, and **MongoDB**.
 
 ---
 
 ## 🌟 Overview
 
-**InterviewAce** is an interactive, client-first web platform designed to help college students and early-career software engineers prepare for placement interviews. Candidates practice in a realistic video-call environment with an animated AI interviewer ("Ace"), answering technical, HR, and behavioral questions through speech or text, and receive immediate deterministic scorecards with actionable benchmark feedback.
+**InterviewAce** is an interactive web platform designed to help college students and early-career software engineers prepare for placement interviews. Candidates practice in a realistic video-call environment with an animated AI interviewer ("Ace"), answering technical, HR, and behavioral questions through speech or text, and receive immediate performance scorecards with benchmark feedback.
 
-The application operates **100% frontend-only** using browser Web APIs (`SpeechSynthesis`, `SpeechRecognition`, and `navigator.mediaDevices.getUserMedia`) and persistent `localStorage`, eliminating the need for expensive external AI API keys or dedicated backend servers.
+The project is structured with an independent client and server architecture:
+- **Frontend**: Client-first React application with responsive White & Emerald UI, local question banks, deterministic scoring, and browser Web Speech APIs.
+- **Backend (Phase 1 — Foundation & Project Setup)**: Modular Express API with centralized routing, Zod environment validation, Mongoose database connection management, Helmet security headers, rate limiting, and comprehensive health monitoring probes.
 
 ---
 
@@ -110,10 +57,11 @@ InterviewAce follows a clean, light, accessible aesthetic:
 - Drill down into any individual session to inspect exact submitted answers alongside model benchmark responses.
 - One-click JSON backup export and data reset controls.
 
-### 5. 👤 Personalized Candidate Profile & Settings
-- Customizable target career tracks (Frontend, Backend, SDE-1, Full Stack MERN, Data Analyst, HR).
-- Interactive skill chip manager and placement goal summary.
-- Voice preference toggles and interview parameter defaults.
+### 5. ⚙️ Robust Backend Foundation (Phase 1)
+- **Centralized Environment Validation**: Validated via Zod with clear startup error diagnostics.
+- **Mongoose Database Management**: Resilient connection handling with automated reconnection event monitoring and graceful shutdown handlers.
+- **API Health & Liveness Probes**: Dedicated `/api/health` and `/api/health/live` endpoints for automated readiness and uptime tracking.
+- **Defense-in-Depth Middleware**: Helmet security headers, 15-minute windowed IP rate limiting, sanitized JSON error responses, and CORS origin enforcement.
 
 ---
 
@@ -123,11 +71,69 @@ Developed collaboratively by 5 final-year engineering students:
 
 | Member | Primary Ownership | Key Deliverables & Files |
 |---|---|---|
-| **Member 1 (Architect)** | Core Architecture, State & Routing | `App.jsx`, `useAuthStore.js`, `useInterviewStore.js`, `interviewService.js`, `formatters.js`, `ErrorBoundary.jsx`, `MainLayout.jsx` |
+| **Member 1 (Architect)** | Core Architecture, State, Routing & Backend Setup | `App.jsx`, `useAuthStore.js`, `useInterviewStore.js`, `server/src/*`, `apiClient.js`, `formatters.js`, `ErrorBoundary.jsx` |
 | **Member 2 (UI/UX)** | Public Experience & Authentication | `LandingPage.jsx`, `LoginPage.jsx`, `SignupPage.jsx`, `PublicNavbar.jsx`, `Footer.jsx`, `AboutPage.jsx` |
 | **Member 3 (Dashboard)** | Dashboard, Setup & Question Engine | `DashboardPage.jsx`, `InterviewSetupPage.jsx`, `questions.js`, `HistoryPage.jsx` |
 | **Member 4 (Media)** | Audio/Video Hardware & Interview Room | `DeviceCheckPage.jsx`, `InterviewRoomPage.jsx`, `AiAvatar.jsx`, `useSpeech.js`, `CodePad.jsx`, `VideoFeed.jsx` |
 | **Member 5 (Reporting)** | Analytics, Evaluation & Settings | `FeedbackReportPage.jsx`, `InterviewDetailPage.jsx`, `ProfilePage.jsx`, `SettingsPage.jsx`, `ScoreRadial.jsx` |
+
+---
+
+## 📂 Project Directory Structure
+
+```text
+InterviewAce-Major-Project/
+├── public/
+│   └── favicon.svg
+├── src/
+│   ├── components/
+│   │   ├── common/              # Reusable UI elements (Button, Input, Card, Modal, etc.)
+│   │   ├── interview/           # Avatar, visualizers, webcam feed, codepad
+│   │   └── layout/              # Navbars, Sidebar, Footers, ErrorBoundary
+│   ├── data/
+│   │   └── questions.js         # Offline role-specific question banks
+│   ├── hooks/                   # Custom Web Speech and Audio hooks
+│   ├── pages/                   # 14 distinct application pages
+│   ├── services/                # Axios apiClient, mock auth, and interview services
+│   ├── store/                   # Zustand stores with persist middleware
+│   ├── utils/                   # Score badge and duration formatters
+│   ├── App.jsx                  # Root client routing
+│   ├── index.css                # Tailwind CSS v4 design tokens
+│   └── main.jsx                 # Client entry point
+│
+├── server/
+│   ├── src/
+│   │   ├── config/
+│   │   │   ├── db.js            # Mongoose connection & status helper
+│   │   │   └── env.js           # Zod-validated environment config
+│   │   ├── controllers/
+│   │   │   └── healthController.js # Health & Liveness controllers
+│   │   ├── middleware/
+│   │   │   ├── errorMiddleware.js     # Sanitized global error handler
+│   │   │   ├── notFoundMiddleware.js  # 404 route handler
+│   │   │   └── rateLimitMiddleware.js # express-rate-limit configuration
+│   │   ├── routes/
+│   │   │   ├── healthRoutes.js  # /api/health endpoints
+│   │   │   └── index.js         # Central API route index
+│   │   ├── utils/
+│   │   │   ├── ApiError.js      # Operational error class
+│   │   │   ├── ApiResponse.js   # Standard success response formatter
+│   │   │   └── asyncHandler.js  # Async route wrapper
+│   │   ├── app.js               # Express application configuration
+│   │   └── server.js            # Backend startup & shutdown entry point
+│   ├── tests/
+│   │   └── health.test.js       # Node.js built-in automated test suite
+│   ├── .env.example             # Backend environment template
+│   ├── .gitignore               # Server secret & dependency ignore rules
+│   ├── package.json             # Independent backend dependencies & scripts
+│   └── package-lock.json
+│
+├── .env.example                 # Frontend environment template
+├── .gitignore                   # Root repository gitignore
+├── package.json                 # Frontend dependencies
+├── vite.config.js
+└── README.md
+```
 
 ---
 
@@ -157,6 +163,7 @@ Developed collaboratively by 5 final-year engineering students:
 
 ## 🛠️ Technology Stack
 
+### Frontend
 - **Core Framework**: React 19 (`react`, `react-dom`)
 - **Build Tool**: Vite 8 with `@tailwindcss/vite`
 - **Routing**: React Router DOM v7 (`react-router-dom`)
@@ -164,52 +171,172 @@ Developed collaboratively by 5 final-year engineering students:
 - **State Management**: Zustand 5 with `persist` middleware
 - **Data Visualizations**: Recharts 3 (`AreaChart`, `Area`, `XAxis`, `YAxis`, `Tooltip`, `ResponsiveContainer`)
 - **Iconography**: Lucide React
-- **Web APIs**: Web Speech API (`SpeechSynthesis`, `webkitSpeechRecognition` / `SpeechRecognition`), `navigator.mediaDevices.getUserMedia`
-- **Storage**: Browser `localStorage` (Zero external database required)
+- **Web APIs**: Web Speech API (`SpeechSynthesis`, `SpeechRecognition`), `navigator.mediaDevices.getUserMedia`
+- **Storage**: Browser `localStorage`
+
+### Backend (Phase 1)
+- **Runtime**: Node.js (v20+ LTS)
+- **Framework**: Express.js 4 (ES Modules)
+- **Database ODM**: Mongoose 8
+- **Configuration & Validation**: `dotenv`, `zod`
+- **Security & Utilities**: `cors`, `helmet`, `morgan`, `express-rate-limit`
+- **Testing**: Node.js built-in test runner (`node --test`), Supertest
 
 ---
 
 ## ⚡ Getting Started
 
 ### Prerequisites
-- Node.js (v18 or higher recommended)
-- npm or yarn
-
-### Installation & Launch
-
-1. **Clone or open the repository**:
-   ```bash
-   cd InterviewAce-Major-Project
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Start the local development server**:
-   ```bash
-   npm run dev
-   ```
-   Open your browser and navigate to `http://localhost:5173`.
-
-4. **Verify production build**:
-   ```bash
-   npm run build
-   ```
+- Node.js (v20 or higher recommended, verified on v24.11.1)
+- npm (v10+ recommended)
+- MongoDB (Local MongoDB Community Server running on `27017` or MongoDB Atlas URI)
 
 ---
 
-## 🔑 Demo Access (1-Click Login)
+### 1. Frontend Setup & Launch
 
-The platform provides a **1-Click Demo Login** button on the Login and Signup screens:
-- **Default Account**: Alex Johnson (`alex.johnson@example.com`)
-- **Target Role**: Frontend Developer / SDE-1
-- **Pre-seeded Records**: 4 completed mock interview sessions across Technical, System Design, and Behavioral tracks.
+From the project root directory:
+
+```bash
+# 1. Install frontend dependencies
+npm install
+
+# 2. Configure environment (optional, defaults to http://localhost:5000/api)
+cp .env.example .env
+
+# 3. Start development server
+npm run dev
+```
+
+The frontend will run at `http://localhost:5173`.
+
+To verify production frontend build:
+```bash
+npm run build
+```
+
+---
+
+### 2. Backend Setup & Launch (Phase 1)
+
+From the project root directory, navigate to the `server/` folder:
+
+```bash
+# 1. Navigate to backend directory
+cd server
+
+# 2. Install backend dependencies
+npm install
+
+# 3. Configure environment
+cp .env.example .env
+```
+
+Review your `server/.env` configuration:
+```env
+NODE_ENV=development
+PORT=5000
+MONGODB_URI=mongodb://127.0.0.1:27017/interviewace
+CLIENT_URL=http://localhost:5173
+```
+
+#### Running Local MongoDB vs MongoDB Atlas:
+- **Local MongoDB**: Ensure MongoDB service is running (`net start MongoDB` on Windows or `brew services start mongodb-community` on macOS). Use `mongodb://127.0.0.1:27017/interviewace`.
+- **MongoDB Atlas**: Replace `MONGODB_URI` with your connection string: `mongodb+srv://<username>:<password>@cluster.mongodb.net/interviewace?retryWrites=true&w=majority`.
+
+#### Starting the Backend:
+```bash
+# Development mode with hot-reloading (nodemon)
+npm run dev
+
+# Standard production startup
+npm start
+```
+
+Backend will listen at `http://localhost:5000`.
+
+---
+
+## 🔍 Health Check & Liveness Probes
+
+The backend exposes two standard monitoring endpoints:
+
+### 1. Full Health Check (with Database status)
+```http
+GET /api/health
+```
+**Healthy Response (HTTP 200)**:
+```json
+{
+  "success": true,
+  "message": "InterviewAce API is healthy",
+  "data": {
+    "service": "InterviewAce Backend",
+    "status": "healthy",
+    "database": "connected",
+    "timestamp": "2026-11-26T13:18:55.973Z",
+    "uptime": 12
+  }
+}
+```
+*Note: If the database is disconnected, this endpoint automatically returns **HTTP 503 Service Unavailable** with `"database": "disconnected"`.*
+
+### 2. Liveness Probe (Process execution status)
+```http
+GET /api/health/live
+```
+**Response (HTTP 200)**:
+```json
+{
+  "success": true,
+  "message": "InterviewAce API is live",
+  "data": {
+    "service": "InterviewAce Backend",
+    "status": "live",
+    "timestamp": "2026-11-26T13:18:55.992Z",
+    "uptime": 12
+  }
+}
+```
+
+---
+
+## 🧪 Automated Testing
+
+Backend unit and integration tests use the Node.js built-in test runner and Supertest. They run without requiring active MongoDB Atlas credentials:
+
+```bash
+cd server
+npm test
+```
+
+**Executed Test Cases**:
+1. `GET /api/health/live` returns HTTP 200 with live process status.
+2. `GET /api/health` returns HTTP 200 when database status is connected.
+3. `GET /api/health` returns HTTP 503 when database is unavailable.
+4. Unknown API routes return HTTP 404 with structured error JSON.
+5. Invalid JSON request payloads return HTTP 400 with syntax error details.
+6. API response structure consistency across success and error responses.
+7. CORS configuration authorizes configured frontend origin and blocks untrusted origins.
+8. Helmet security headers attached and `X-Powered-By` disabled.
+
+---
+
+## 📌 Phase 1 Scope & Limitations
+
+> [!NOTE]
+> **Phase 1 strictly establishes backend foundation and infrastructure setup.**
+> The following features are intentionally scoped for future phases and not yet implemented:
+> - User registration, login, and JWT authentication (Phase 2)
+> - User and Interview Mongoose database models
+> - AI generation with Gemini / OpenAI APIs
+> - Resume parsing and file uploads
+> - Production cloud deployment
+> 
+> The frontend currently operates using self-contained mock services and browser storage, ensuring uninterrupted client functionality while backend phases progress.
 
 ---
 
 ## 📝 License & Academic Acknowledgement
 
 Developed as a Final-Year Major Project for the Bachelor of Technology (B.Tech) in Computer Science & Engineering degree. Designed for demonstration, evaluation, and viva presentations.
->>>>>>> dc7aa9a2f458d6261855d78926e101e10312746e
