@@ -1,133 +1,213 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { loginUser, signupUser, demoLoginUser } from '../services/authService';
+import {
+  loginUser,
+  signupUser,
+  getCurrentUser,
+  logoutUser,
+  updateUserProfile,
+  updateUserPreferences,
+  changeUserPassword,
+} from '../services/authService';
+import { useInterviewStore } from './useInterviewStore';
 
 /**
- * @typedef {Object} UserProfile
- * @property {string} id
- * @property {string} name
- * @property {string} email
- * @property {string} targetRole
+ * Centralized Authentication Store (Real MongoDB + HttpOnly JWT session).
+ * Client session state is hydrated on app startup via GET /api/auth/me.
  */
+export const useAuthStore = create((set, get) => ({
+  // State
+  user: null,
+  isAuthenticated: false,
+  isLoading: false,
+  isInitialized: false,
+  error: null,
 
-/**
- * Centralized Authentication Store.
- * Uses Zustand persist middleware to preserve login credentials across browser refreshes.
- */
-export const useAuthStore = create(
-  persist(
-    (set) => ({
-      // State
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
+  // Actions
 
-      // Actions
+  /**
+   * Initializes authentication state by querying the server's session endpoint.
+   * Runs once on application mount.
+   */
+  initializeAuth: async () => {
+    // Avoid re-running initialization if already in progress
+    if (get().isLoading) return;
 
-      /**
-       * Authenticates a user with email and password.
-       * @param {Object} credentials
-       * @param {string} credentials.email
-       * @param {string} credentials.password
-       * @returns {Promise<UserProfile>}
-       */
-      login: async (credentials) => {
-        set({ isLoading: true, error: null });
-        try {
-          const { user, token } = await loginUser(credentials);
-          localStorage.setItem('token', token);
-          set({
-            user,
-            token,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-          return user;
-        } catch (err) {
-          const errorMessage = err.response?.data?.message || err.message || 'Login failed. Please check credentials.';
-          set({ isLoading: false, error: errorMessage });
-          throw new Error(errorMessage);
-        }
-      },
-
-      /**
-       * Registers a new user account.
-       * @param {Object} userData
-       * @param {string} userData.name
-       * @param {string} userData.email
-       * @param {string} userData.password
-       * @param {string} [userData.targetRole]
-       * @returns {Promise<UserProfile>}
-       */
-      signup: async (userData) => {
-        set({ isLoading: true, error: null });
-        try {
-          const { user, token } = await signupUser(userData);
-          localStorage.setItem('token', token);
-          set({
-            user,
-            token,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-          return user;
-        } catch (err) {
-          const errorMessage = err.response?.data?.message || err.message || 'Signup failed. Please try again.';
-          set({ isLoading: false, error: errorMessage });
-          throw new Error(errorMessage);
-        }
-      },
-
-      /**
-       * Authenticates immediately with a mock demo candidate profile.
-       * Useful for development, testing, and team walkthroughs.
-       * @returns {Promise<UserProfile>}
-       */
-      demoLogin: async () => {
-        set({ isLoading: true, error: null });
-        try {
-          const { user, token } = await demoLoginUser();
-          localStorage.setItem('token', token);
-          set({
-            user,
-            token,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-          return user;
-        } catch (err) {
-          const errorMessage = err.message || 'Demo login failed.';
-          set({ isLoading: false, error: errorMessage });
-          throw new Error(errorMessage);
-        }
-      },
-
-      /**
-       * Logs out the user and clears all session state from storage.
-       */
-      logout: () => {
-        localStorage.removeItem('token');
+    set({ isLoading: true, error: null });
+    try {
+      const data = await getCurrentUser();
+      if (data?.user) {
         set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
+          user: data.user,
+          isAuthenticated: true,
+          isInitialized: true,
           isLoading: false,
           error: null,
         });
-      },
-    }),
-    {
-      name: 'interviewace-auth', // Storage key in localStorage
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
-      }),
+      } else {
+        set({
+          user: null,
+          isAuthenticated: false,
+          isInitialized: true,
+          isLoading: false,
+        });
+      }
+    } catch {
+      // 401 Unauthorized or network unavailable on startup is normal for unauthenticated guests
+      set({
+        user: null,
+        isAuthenticated: false,
+        isInitialized: true,
+        isLoading: false,
+      });
     }
-  )
-);
+  },
+
+  /**
+   * Refreshes the user profile data from the backend.
+   */
+  fetchCurrentUser: async () => {
+    try {
+      const data = await getCurrentUser();
+      if (data?.user) {
+        set({ user: data.user, isAuthenticated: true });
+      }
+    } catch (err) {
+      console.warn('[useAuthStore] fetchCurrentUser error:', err.message);
+    }
+  },
+
+  /**
+   * Authenticates user with email and password via POST /api/auth/login.
+   */
+  login: async (credentials) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await loginUser(credentials);
+      set({
+        user: data.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+      return data.user;
+    } catch (err) {
+      const errorMessage = err.message || 'Login failed. Please check credentials.';
+      set({ isLoading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Registers a new account via POST /api/auth/signup.
+   */
+  signup: async (userData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await signupUser(userData);
+      set({
+        user: data.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+      return data.user;
+    } catch (err) {
+      const errorMessage = err.message || 'Signup failed. Please try again.';
+      set({ isLoading: false, error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Logs out the user via POST /api/auth/logout, clearing the HttpOnly cookie
+   * and resetting in-memory interview state.
+   */
+  logout: async () => {
+    set({ isLoading: true });
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.warn('[useAuthStore] Logout server call error:', err.message);
+    } finally {
+      // Reset active interview store state
+      try {
+        useInterviewStore.getState().resetInterview();
+      } catch (e) {
+        // Safe fallback
+      }
+
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+    }
+  },
+
+  /**
+   * Updates candidate profile information in MongoDB.
+   */
+  updateProfile: async (profileUpdates) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await updateUserProfile(profileUpdates);
+      set((state) => ({
+        user: { ...state.user, ...data.user },
+        isLoading: false,
+      }));
+      return data.user;
+    } catch (err) {
+      set({ isLoading: false, error: err.message });
+      throw err;
+    }
+  },
+
+  /**
+   * Updates candidate interview preferences in MongoDB.
+   */
+  updatePreferences: async (preferences) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await updateUserPreferences(preferences);
+      set((state) => ({
+        user: {
+          ...state.user,
+          preferences: {
+            ...(state.user?.preferences || {}),
+            ...(data.user?.preferences || {}),
+          },
+        },
+        isLoading: false,
+      }));
+      return data.user;
+    } catch (err) {
+      set({ isLoading: false, error: err.message });
+      throw err;
+    }
+  },
+
+  /**
+   * Changes account password and logs out on success.
+   */
+  changePassword: async (passwordData) => {
+    set({ isLoading: true, error: null });
+    try {
+      await changeUserPassword(passwordData);
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+    } catch (err) {
+      set({ isLoading: false, error: err.message });
+      throw err;
+    }
+  },
+
+  /**
+   * Clears any active error banner.
+   */
+  clearError: () => set({ error: null }),
+}));

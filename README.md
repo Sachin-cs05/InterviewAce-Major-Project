@@ -63,6 +63,19 @@ InterviewAce follows a clean, light, accessible aesthetic:
 - **API Health & Liveness Probes**: Dedicated `/api/health` and `/api/health/live` endpoints for automated readiness and uptime tracking.
 - **Defense-in-Depth Middleware**: Helmet security headers, 15-minute windowed IP rate limiting, sanitized JSON error responses, and CORS origin enforcement.
 
+### 6. 🔐 Complete Authentication & User Management (Phase 2)
+- **Real MongoDB User Model**: Mongoose schema with `passwordHash` hidden by default, `tokenVersion` for revoking compromised sessions, timestamps, and nested preferences.
+- **Bcryptjs Password Security**: 12 salt rounds, strictly capped at 72 bytes to prevent bcrypt DoS, and hidden from queries by default.
+- **JWT & HttpOnly Session Cookies**: Stateless JSON Web Token authentication delivered via HttpOnly, SameSite=lax cookies (`interviewace_token`).
+- **Double-Submit CSRF Defense**: Origin header verification paired with cryptographic CSRF token generation (`GET /api/auth/csrf`) and strict `x-csrf-token` header inspection on mutating requests.
+- **Protected User Profile & Preferences APIs**:
+  - `GET /api/users/me` — Retrieve current authenticated profile.
+  - `PATCH /api/users/me` — Update name, target role, experience, education, and skills.
+  - `PATCH /api/users/me/preferences` — Update interview settings (voice, default track, difficulty, questions).
+  - `PATCH /api/users/me/password` — Change password, revoke all existing tokens, and prompt re-login.
+- **Candidate Data Isolation**: Multi-user privacy guarantees that local mock interview records, scores, and transcripts are strictly isolated per user ID (`interviewace-history-${userId}`).
+- **100% Automated Test Coverage**: 23 automated tests covering Health, Authentication, and User Profile APIs.
+
 ---
 
 ## 👥 5-Member Team Architecture & Work Breakdown
@@ -107,25 +120,42 @@ InterviewAce-Major-Project/
 │   │   │   ├── db.js            # Mongoose connection & status helper
 │   │   │   └── env.js           # Zod-validated environment config
 │   │   ├── controllers/
-│   │   │   └── healthController.js # Health & Liveness controllers
+│   │   │   ├── authController.js   # Signup, login, session, logout
+│   │   │   ├── healthController.js # Health & Liveness controllers
+│   │   │   └── userController.js   # Profile, preferences, password
 │   │   ├── middleware/
+│   │   │   ├── authMiddleware.js      # JWT cookie authentication & tokenVersion verification
+│   │   │   ├── csrfMiddleware.js      # Double-submit CSRF & origin inspection
 │   │   │   ├── errorMiddleware.js     # Sanitized global error handler
 │   │   │   ├── notFoundMiddleware.js  # 404 route handler
-│   │   │   └── rateLimitMiddleware.js # express-rate-limit configuration
+│   │   │   ├── rateLimitMiddleware.js # express-rate-limit configuration
+│   │   │   └── validateMiddleware.js  # Zod schema validation middleware
+│   │   ├── models/
+│   │   │   └── User.js          # Mongoose candidate user model with bcryptjs
 │   │   ├── routes/
+│   │   │   ├── authRoutes.js    # /api/auth endpoints
 │   │   │   ├── healthRoutes.js  # /api/health endpoints
-│   │   │   └── index.js         # Central API route index
+│   │   │   ├── index.js         # Central API route index
+│   │   │   └── userRoutes.js    # /api/users endpoints
 │   │   ├── utils/
 │   │   │   ├── ApiError.js      # Operational error class
 │   │   │   ├── ApiResponse.js   # Standard success response formatter
-│   │   │   └── asyncHandler.js  # Async route wrapper
+│   │   │   ├── asyncHandler.js  # Async route wrapper
+│   │   │   ├── cookieOptions.js # HttpOnly & CSRF cookie attribute builders
+│   │   │   └── tokenUtils.js    # JWT sign & verify helpers
+│   │   ├── validators/
+│   │   │   ├── authValidator.js # Zod schemas for signup & login
+│   │   │   └── userValidator.js # Zod schemas for profile, preferences & password
 │   │   ├── app.js               # Express application configuration
 │   │   └── server.js            # Backend startup & shutdown entry point
 │   ├── tests/
-│   │   └── health.test.js       # Node.js built-in automated test suite
+│   │   ├── auth.test.js         # Authentication API test suite (9 tests)
+│   │   ├── health.test.js       # Health & Architecture test suite (8 tests)
+│   │   ├── testHelper.js        # Test DB connection and cookie extraction helpers
+│   │   └── user.test.js         # User profile & preferences test suite (6 tests)
 │   ├── .env.example             # Backend environment template
 │   ├── .gitignore               # Server secret & dependency ignore rules
-│   ├── package.json             # Independent backend dependencies & scripts
+│   ├── package.json             # Independent backend dependencies & test scripts
 │   └── package-lock.json
 │
 ├── .env.example                 # Frontend environment template

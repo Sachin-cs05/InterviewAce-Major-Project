@@ -22,6 +22,8 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { useInterviewStore } from '../store/useInterviewStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { getUserInterviewHistory, saveUserInterviewHistory } from '../utils/userStorage';
 import { getQuestionsForConfig } from '../data/questions';
 import useSpeech from '../hooks/useSpeech';
 import Button from '../components/common/Button';
@@ -323,10 +325,10 @@ export default function InterviewRoomPage() {
     localStorage.setItem('interviewace-last-result', JSON.stringify(finalReport));
     localStorage.setItem(`interviewace-report-${activeSessionId}`, JSON.stringify(finalReport));
 
-    // 2. Prepend to interview history array
+    // 2. Prepend to user-isolated interview history array
     try {
-      const historyRaw = localStorage.getItem('interviewace-history');
-      const history = historyRaw ? JSON.parse(historyRaw) : [];
+      const currentUserId = useAuthStore.getState().user?.id;
+      const history = getUserInterviewHistory(currentUserId);
       const updatedHistory = [
         {
           sessionId: activeSessionId,
@@ -341,7 +343,7 @@ export default function InterviewRoomPage() {
         },
         ...history,
       ];
-      localStorage.setItem('interviewace-history', JSON.stringify(updatedHistory));
+      saveUserInterviewHistory(currentUserId, updatedHistory);
     } catch (saveErr) {
       console.warn('History save error:', saveErr);
     }

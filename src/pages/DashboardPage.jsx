@@ -25,6 +25,7 @@ import {
 } from 'recharts';
 import { useAuthStore } from '../store/useAuthStore';
 import { getPastInterviews } from '../services/interviewService';
+import { getUserInterviewHistory, saveUserInterviewHistory } from '../utils/userStorage';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
@@ -41,28 +42,25 @@ export default function DashboardPage() {
   const [interviews, setInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load interviews from localStorage or mock service
+  // Load interviews from user-isolated storage or mock service
   useEffect(() => {
     let isMounted = true;
     const fetchHistory = async () => {
       try {
-        const local = localStorage.getItem('interviewace-history');
-        if (local) {
-          const parsed = JSON.parse(local);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            if (isMounted) {
-              setInterviews(parsed);
-              setLoading(false);
-              return;
-            }
+        const local = getUserInterviewHistory(user?.id);
+        if (local && local.length > 0) {
+          if (isMounted) {
+            setInterviews(local);
+            setLoading(false);
+            return;
           }
         }
 
         const data = await getPastInterviews();
         if (isMounted) {
           setInterviews(data);
-          // Seed localStorage so persistence is established
-          localStorage.setItem('interviewace-history', JSON.stringify(data));
+          // Seed isolated user storage so persistence is established
+          saveUserInterviewHistory(user?.id, data);
           setLoading(false);
         }
       } catch {
@@ -74,7 +72,7 @@ export default function DashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user?.id]);
 
   // Compute live statistics
   const totalInterviews = interviews.length;
